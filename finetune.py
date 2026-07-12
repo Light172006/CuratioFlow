@@ -62,6 +62,8 @@ training_args = SFTConfig(
     dataset_text_field="text",
     packing=False,
     report_to="none",
+    eval_strategy="steps",
+    eval_steps=100,
 )
 
 def format_example(example):
@@ -69,16 +71,18 @@ def format_example(example):
         {"role": "user", "content": example["question"]},
         {"role": "assistant", "content": example["answer"]},
     ]
-    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False, enable_thinking=False,)
 
 from datasets import Dataset
 
 dataset = pd.read_csv(r'D:\CuratioFlow\data\data.csv')   # your existing pandas load
 dataset = Dataset.from_pandas(dataset)                    # convert here
+dataset = dataset.train_test_split(test_size=0.1, seed=42)
 
 trainer = SFTTrainer(
     model=model,
-    train_dataset=dataset,          # your raw dataset, unformatted
+    train_dataset=dataset['train'],          # your raw dataset, unformatted
+    eval_dataset=dataset['test'],
     peft_config=peft_config,
     formatting_func=format_example,  # just the function reference here
     processing_class=tokenizer,

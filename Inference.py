@@ -43,15 +43,13 @@ model.eval()   # inference mode — disables dropout etc., which are only meant 
 # Single-turn generation function
 # ------------------------------------------------------------------
 
-def generate_response(user_input: str) -> str:
-    messages = [{"role": "user", "content": user_input}]
-
+def generate_response(conversation_history):
     prompt = tokenizer.apply_chat_template(
-        messages,
+        conversation_history,
         tokenize=False,
         add_generation_prompt=True,
+        enable_thinking=False,
     )
-
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
     with torch.no_grad():
@@ -64,27 +62,20 @@ def generate_response(user_input: str) -> str:
             pad_token_id=tokenizer.eos_token_id,
         )
 
-    # Slice off the prompt portion so we only decode the newly generated tokens
     new_tokens = output_ids[0][inputs["input_ids"].shape[1]:]
-    response = tokenizer.decode(new_tokens, skip_special_tokens=True)
-    return response.strip()
+    response = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+    return response
 
-# ------------------------------------------------------------------
-# Interactive loop
-# ------------------------------------------------------------------
+# Interactive loop with history
+conversation_history = []
 
-if __name__ == "__main__":
-    print("\nModel loaded. Type your message, or 'end' to quit.\n")
+while True:
+    user_input = input("You: ").strip()
+    if user_input.lower() == "end":
+        break
 
-    while True:
-        user_input = input("You: ").strip()
+    conversation_history.append({"role": "user", "content": user_input})
+    reply = generate_response(conversation_history)
+    conversation_history.append({"role": "assistant", "content": reply})
 
-        if user_input.lower() == "end":
-            print("Ending session.")
-            break
-
-        if not user_input:
-            continue
-
-        reply = generate_response(user_input)
-        print(f"Model: {reply}\n")
+    print(f"Model: {reply}\n")
